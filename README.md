@@ -80,13 +80,22 @@ sudo chown -R odoo:odoo /opt/odoo/custom_addons/leave_request
 sudo systemctl restart odoo
 ```
 
-### 4. Install the Module
+### 4. Access Odoo
+Open a web browser and navigate to:
+```
+http://localhost:8069
+```
+(or the IP/hostname of your Odoo server if remote)
+
+Login with credentials configured in your Odoo instance (default: admin / admin if using demo).
+
+### 5. Install the Module
 1. Log in to Odoo → **Apps**
 2. Click **Update Apps List**
 3. Search for **"Leave Management"**
 4. Click **Activate**
 
-### 5. Assign User Roles
+### 6. Assign User Roles
 1. Go to **Settings → Users & Companies → Users**
 2. Open each user who should use the module
 3. Under **Leave Management**, assign one role:
