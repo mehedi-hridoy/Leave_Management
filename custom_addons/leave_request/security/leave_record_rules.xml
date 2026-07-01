@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <!--
+        Record Rules for Leave Requests
+        ================================
+        Record rules restrict WHICH records a user can access.
+        Access rights (ir.model.access.csv) control WHAT operations are allowed.
+        Record rules control WHICH records those operations apply to.
+
+        Important: Rules within the same group are OR'd together.
+        Rules across different groups are AND'd together.
+    -->
+
+    <!-- Leave User: Can only see their own leave requests -->
+    <record id="leave_request_rule_user" model="ir.rule">
+        <field name="name">Leave Request: User sees own requests</field>
+        <field name="model_id" ref="model_leave_request"/>
+        <field name="domain_force">[('employee_id.user_id', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('group_leave_user'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <!--
+        Leave Manager: Can see own requests + requests from their subordinates.
+        The '|' (OR) operator combines both conditions:
+        - My own requests (employee_id.user_id = me)
+        - Requests where I am the manager (manager_id.user_id = me)
+    -->
+    <record id="leave_request_rule_manager" model="ir.rule">
+        <field name="name">Leave Request: Manager sees team requests</field>
+        <field name="model_id" ref="model_leave_request"/>
+        <field name="domain_force">
+            ['|',
+                ('employee_id.user_id', '=', user.id),
+                ('manager_id.user_id', '=', user.id)]
+        </field>
+        <field name="groups" eval="[(4, ref('group_leave_manager'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <!-- Leave Administrator: Can see ALL leave requests (no domain restriction) -->
+    <record id="leave_request_rule_admin" model="ir.rule">
+        <field name="name">Leave Request: Administrator sees all</field>
+        <field name="model_id" ref="model_leave_request"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('group_leave_admin'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <!--
+        Leave Type: Visible to all internal users (no restriction needed).
+        Leave types are configuration data — everyone should be able to
+        read them. Write access is controlled by ir.model.access.csv.
+    -->
+
+    <!-- Multi-company rule: Users only see data from their own company -->
+    <record id="leave_request_rule_company" model="ir.rule">
+        <field name="name">Leave Request: Multi-company</field>
+        <field name="model_id" ref="model_leave_request"/>
+        <field name="domain_force">
+            ['|',
+                ('company_id', '=', False),
+                ('company_id', 'in', company_ids)]
+        </field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+</odoo>

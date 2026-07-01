@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <!--
+        Security Groups for Leave Management
+        =====================================
+        Hierarchy: User → Manager → Administrator
+
+        How Odoo security groups work:
+        - Groups are defined as ir.model.data records
+        - The 'category_id' groups them under a section in Settings → Users
+        - The 'implied_ids' field creates inheritance:
+            If you are a Manager, you automatically get User rights too
+        - Odoo shows these as a dropdown in user settings:
+            Leave Management: [None | User | Manager | Administrator]
+    -->
+
+    <!-- Module Category (appears in Settings → Users as a section) -->
+    <record id="module_category_leave_management" model="ir.module.category">
+        <field name="name">Leave Management</field>
+        <field name="description">Category for leave management security groups.</field>
+        <field name="sequence">50</field>
+    </record>
+
+    <!-- Group: Leave User — All internal users who can request leaves -->
+    <record id="group_leave_user" model="res.groups">
+        <field name="name">User</field>
+        <field name="category_id" ref="module_category_leave_management"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">
+            Can create and manage their own leave requests.
+            Cannot approve or refuse requests.
+        </field>
+    </record>
+
+    <!-- Group: Leave Manager — Can approve/refuse team leaves -->
+    <record id="group_leave_manager" model="res.groups">
+        <field name="name">Manager</field>
+        <field name="category_id" ref="module_category_leave_management"/>
+        <field name="implied_ids" eval="[(4, ref('group_leave_user'))]"/>
+        <field name="comment">
+            Can view and approve/refuse leave requests
+            for employees in their team.
+        </field>
+    </record>
+
+    <!-- Group: Leave Administrator — Full access to all leave data -->
+    <record id="group_leave_admin" model="res.groups">
+        <field name="name">Administrator</field>
+        <field name="category_id" ref="module_category_leave_management"/>
+        <field name="implied_ids" eval="[(4, ref('group_leave_manager'))]"/>
+        <field name="comment">
+            Full access to all leave requests and configuration.
+            Can manage leave types and system settings.
+        </field>
+    </record>
+
+</odoo>

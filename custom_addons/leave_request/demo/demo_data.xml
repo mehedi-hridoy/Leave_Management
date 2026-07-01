@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <data>
+        <!--
+            Demo data is loaded only when the database is created
+            with "Load demonstration data" checked.
+            It will be populated in Phase 4 with realistic test records.
+        -->
+    </data>
+</odoo>

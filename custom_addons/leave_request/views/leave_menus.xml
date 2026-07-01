@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+
+    <!--
+        Menu Architecture
+        ==================
+        This file MUST be loaded LAST in __manifest__.py because it
+        references actions defined in other view files.
+
+        Menu structure:
+        ┌─ Leave Management (root — app icon in top nav)
+        │  ├─ Leave Requests
+        │  │  ├─ My Requests (action_leave_request)
+        │  │  └─ Requests to Approve (action_leave_request_to_approve)
+        │  └─ Configuration
+        │     └─ Leave Types (action_leave_type)
+    -->
+
+    <!-- ================================================================== -->
+    <!-- Root Menu (Application — appears in top navigation bar)             -->
+    <!-- ================================================================== -->
+    <menuitem id="menu_leave_root"
+              name="Leave Management"
+              web_icon="leave_request,static/description/icon.png"
+              sequence="90"/>
+
+    <!-- ================================================================== -->
+    <!-- First Level: Leave Requests                                         -->
+    <!-- ================================================================== -->
+    <menuitem id="menu_leave_requests"
+              name="Leave Requests"
+              parent="menu_leave_root"
+              sequence="10"/>
+
+    <!-- Second Level: My Requests -->
+    <menuitem id="menu_leave_request_my"
+              name="My Requests"
+              parent="menu_leave_requests"
+              action="action_leave_request"
+              sequence="10"/>
+
+    <!-- Second Level: Requests to Approve (visible to managers only) -->
+    <menuitem id="menu_leave_request_to_approve"
+              name="Requests to Approve"
+              parent="menu_leave_requests"
+              action="action_leave_request_to_approve"
+              groups="group_leave_manager"
+              sequence="20"/>
+
+    <!-- ================================================================== -->
+    <!-- First Level: Configuration                                          -->
+    <!-- ================================================================== -->
+    <menuitem id="menu_leave_configuration"
+              name="Configuration"
+              parent="menu_leave_root"
+              groups="group_leave_admin"
+              sequence="90"/>
+
+    <!-- Second Level: Leave Types -->
+    <menuitem id="menu_leave_type"
+              name="Leave Types"
+              parent="menu_leave_configuration"
+              action="action_leave_type"
+              sequence="10"/>
+
+</odoo>

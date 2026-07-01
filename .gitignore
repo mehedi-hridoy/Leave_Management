@@ -1,0 +1,57 @@
+# =============================================================================
+# Odoo 17 Custom Addons — .gitignore
+# =============================================================================
+
+# ─── Python bytecode ─────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# ─── Virtual environments ────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+.env/
+
+# ─── IDE / Editor files ──────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+*.sublime-project
+*.sublime-workspace
+
+# ─── OS generated files ──────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Odoo specific ───────────────────────────────────────────────────────────
+# Odoo filestore (uploaded attachments, session data)
+filestore/
+sessions/
+
+# Odoo auto-generated asset bundles
+static/lib/
+static/src/css/*.min.css
+static/src/js/*.min.js
+
+# ─── Distribution / packaging ────────────────────────────────────────────────
+dist/
+build/
+*.egg-info/
+*.egg
+*.whl
+
+# ─── Testing ─────────────────────────────────────────────────────────────────
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# ─── Logs ────────────────────────────────────────────────────────────────────
+*.log
