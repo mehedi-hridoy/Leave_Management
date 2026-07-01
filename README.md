@@ -4,6 +4,14 @@ A professional Employee Leave Request Management System built for Odoo 17 Commun
 
 ---
 
+## Live Demo
+
+Watch the live demo video here:
+
+- https://drive.google.com/file/d/1P6N02jTxgpDQMEi0VHyiIMAvVOVC9lRA/view?usp=sharing
+
+---
+
 ## Features
 
 ### Core
