@@ -1,10 +1,81 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <odoo>
-    <data>
+    <data noupdate="1">
+
         <!--
-            Demo data is loaded only when the database is created
-            with "Load demonstration data" checked.
-            It will be populated in Phase 4 with realistic test records.
+            Demo Employees
+            ===============
+            These are only loaded when the database has "Demo Data" enabled.
         -->
+        <record id="demo_dept_engineering" model="hr.department">
+            <field name="name">Engineering</field>
+        </record>
+
+        <record id="demo_employee_manager" model="hr.employee">
+            <field name="name">Sarah Ahmed</field>
+            <field name="job_title">Engineering Manager</field>
+            <field name="department_id" ref="demo_dept_engineering"/>
+            <field name="user_id" ref="base.user_admin"/>
+        </record>
+
+        <record id="demo_employee_dev1" model="hr.employee">
+            <field name="name">Rahim Khan</field>
+            <field name="job_title">Software Developer</field>
+            <field name="department_id" ref="demo_dept_engineering"/>
+            <field name="parent_id" ref="demo_employee_manager"/>
+        </record>
+
+        <record id="demo_employee_dev2" model="hr.employee">
+            <field name="name">Fatima Begum</field>
+            <field name="job_title">QA Engineer</field>
+            <field name="department_id" ref="demo_dept_engineering"/>
+            <field name="parent_id" ref="demo_employee_manager"/>
+        </record>
+
+        <!--
+            Demo Leave Requests
+            =====================
+            Sample requests in various states to demonstrate the workflow.
+        -->
+        <record id="demo_leave_draft" model="leave.request">
+            <field name="employee_id" ref="demo_employee_dev1"/>
+            <field name="leave_type_id" ref="leave_type_casual"/>
+            <field name="date_from" eval="(DateTime.today() + relativedelta(days=7)).strftime('%Y-%m-%d')"/>
+            <field name="date_to" eval="(DateTime.today() + relativedelta(days=8)).strftime('%Y-%m-%d')"/>
+            <field name="reason">Personal errands — need two days off next week.</field>
+            <field name="approver_id" ref="demo_employee_manager"/>
+            <field name="state">draft</field>
+        </record>
+
+        <record id="demo_leave_submitted" model="leave.request">
+            <field name="employee_id" ref="demo_employee_dev2"/>
+            <field name="leave_type_id" ref="leave_type_sick"/>
+            <field name="date_from" eval="(DateTime.today() + relativedelta(days=3)).strftime('%Y-%m-%d')"/>
+            <field name="date_to" eval="(DateTime.today() + relativedelta(days=5)).strftime('%Y-%m-%d')"/>
+            <field name="reason">Not feeling well, need rest days.</field>
+            <field name="approver_id" ref="demo_employee_manager"/>
+            <field name="state">submitted</field>
+        </record>
+
+        <record id="demo_leave_approved" model="leave.request">
+            <field name="employee_id" ref="demo_employee_dev1"/>
+            <field name="leave_type_id" ref="leave_type_annual"/>
+            <field name="date_from" eval="(DateTime.today() + relativedelta(days=14)).strftime('%Y-%m-%d')"/>
+            <field name="date_to" eval="(DateTime.today() + relativedelta(days=20)).strftime('%Y-%m-%d')"/>
+            <field name="reason">Annual family vacation.</field>
+            <field name="approver_id" ref="demo_employee_manager"/>
+            <field name="state">approved</field>
+        </record>
+
+        <record id="demo_leave_rejected" model="leave.request">
+            <field name="employee_id" ref="demo_employee_dev2"/>
+            <field name="leave_type_id" ref="leave_type_casual"/>
+            <field name="date_from" eval="(DateTime.today() - relativedelta(days=5)).strftime('%Y-%m-%d')"/>
+            <field name="date_to" eval="(DateTime.today() - relativedelta(days=3)).strftime('%Y-%m-%d')"/>
+            <field name="reason">Wanted to attend a workshop.</field>
+            <field name="approver_id" ref="demo_employee_manager"/>
+            <field name="state">rejected</field>
+        </record>
+
     </data>
 </odoo>

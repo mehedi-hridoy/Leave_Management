@@ -10,7 +10,7 @@ class LeaveRequest(models.Model):
     Inherits mail.thread for chatter integration (messages, followers)
     and mail.activity.mixin for scheduling activities (reminders, to-dos).
 
-    Workflow: Draft → Confirmed → Approved / Refused
+    Workflow: Draft → Submitted → Approved / Rejected
     """
 
     _name = "leave.request"
@@ -28,7 +28,7 @@ class LeaveRequest(models.Model):
         copy=False,
         readonly=True,
         default=lambda self: _("New"),
-        help="Auto-generated sequence number for this leave request.",
+        help="Auto-generated sequence number (e.g., LR/2026/0001).",
     )
     employee_id = fields.Many2one(
         comodel_name="hr.employee",
@@ -54,7 +54,14 @@ class LeaveRequest(models.Model):
         related="employee_id.parent_id",
         store=True,
         readonly=True,
-        help="Auto-filled from the employee's manager.",
+        help="Auto-filled from the employee's reporting manager.",
+    )
+    approver_id = fields.Many2one(
+        comodel_name="hr.employee",
+        string="Approver",
+        tracking=True,
+        help="The person responsible for approving this request. "
+             "Defaults to the employee's manager but can be changed.",
     )
     leave_type_id = fields.Many2one(
         comodel_name="leave.type",
@@ -89,9 +96,9 @@ class LeaveRequest(models.Model):
     state = fields.Selection(
         selection=[
             ("draft", "Draft"),
-            ("confirmed", "Confirmed"),
+            ("submitted", "Submitted"),
             ("approved", "Approved"),
-            ("refused", "Refused"),
+            ("rejected", "Rejected"),
         ],
         string="Status",
         default="draft",
@@ -137,15 +144,26 @@ class LeaveRequest(models.Model):
                 record.number_of_days = 0.0
 
     # -------------------------------------------------------------------------
+    # Onchange Methods
+    # -------------------------------------------------------------------------
+    @api.onchange("employee_id")
+    def _onchange_employee_id(self):
+        """Auto-fill the approver when the employee changes.
+
+        Sets the approver to the employee's direct manager.
+        The user can override this if a different approver is needed.
+        """
+        if self.employee_id and self.employee_id.parent_id:
+            self.approver_id = self.employee_id.parent_id
+        else:
+            self.approver_id = False
+
+    # -------------------------------------------------------------------------
     # Constraint Methods
     # -------------------------------------------------------------------------
     @api.constrains("date_from", "date_to")
     def _check_dates(self):
-        """Validate that end date is not before start date.
-
-        This is a Python-level constraint that provides a user-friendly
-        error message. The SQL constraint above is the database-level safety net.
-        """
+        """Validate that end date is not before start date."""
         for record in self:
             if record.date_from and record.date_to:
                 if record.date_to < record.date_from:
@@ -153,30 +171,106 @@ class LeaveRequest(models.Model):
                         _("End date cannot be before start date.")
                     )
 
+    @api.constrains("employee_id", "date_from", "date_to", "state")
+    def _check_overlap(self):
+        """Prevent overlapping leave requests for the same employee.
+
+        Two leave requests overlap when one starts before the other ends
+        AND ends after the other starts. Only checks submitted/approved
+        requests — draft and rejected ones are excluded.
+        """
+        for record in self:
+            if record.state in ("submitted", "approved"):
+                domain = [
+                    ("employee_id", "=", record.employee_id.id),
+                    ("id", "!=", record.id),
+                    ("state", "in", ("submitted", "approved")),
+                    ("date_from", "<=", record.date_to),
+                    ("date_to", ">=", record.date_from),
+                ]
+                overlapping = self.search(domain, limit=1)
+                if overlapping:
+                    raise ValidationError(
+                        _("This employee already has a leave request "
+                          "(%s) that overlaps with these dates.")
+                        % overlapping.name
+                    )
+
     # -------------------------------------------------------------------------
     # CRUD Overrides
     # -------------------------------------------------------------------------
     @api.model_create_multi
     def create(self, vals_list):
-        """Override create to assign automatic sequence number.
-
-        When a new leave request is created, the 'name' field is
-        populated from the ir.sequence 'leave.request' (e.g., LR/2026/0001).
-        """
+        """Assign sequence numbers and enforce employee ownership."""
+        is_admin = self._is_leave_admin()
+        current_employee = self._get_current_employee(required=not is_admin)
         for vals in vals_list:
             if vals.get("name", _("New")) == _("New"):
                 vals["name"] = (
                     self.env["ir.sequence"].next_by_code("leave.request")
                     or _("New")
                 )
+            if not vals.get("employee_id") and current_employee:
+                vals["employee_id"] = current_employee.id
+            if (
+                not is_admin
+                and current_employee
+                and vals.get("employee_id") != current_employee.id
+            ):
+                raise UserError(
+                    _("You can only create leave requests for yourself.")
+                )
+            if not vals.get("approver_id") and vals.get("employee_id"):
+                employee = self.env["hr.employee"].browse(vals["employee_id"])
+                vals["approver_id"] = employee.parent_id.id or False
         return super().create(vals_list)
 
-    def unlink(self):
-        """Prevent deletion of non-draft leave requests.
+    def write(self, vals):
+        """Prevent unauthorized direct edits outside the workflow methods."""
+        if self.env.context.get("leave_workflow_action"):
+            return super().write(vals)
 
-        Only draft requests can be deleted. Once a request is confirmed,
-        approved, or refused, it must be kept for audit trail purposes.
-        """
+        protected_fields = {
+            "employee_id",
+            "approver_id",
+            "leave_type_id",
+            "date_from",
+            "date_to",
+            "reason",
+        }
+        is_admin = self._is_leave_admin()
+        current_employee = self._get_current_employee(required=not is_admin)
+
+        if "state" in vals and not is_admin:
+            raise UserError(
+                _("Please use the workflow buttons to change the request status.")
+            )
+
+        for record in self:
+            if not is_admin and record.employee_id != current_employee:
+                raise UserError(
+                    _("You can only edit your own leave requests.")
+                )
+            if (
+                not is_admin
+                and record.state != "draft"
+                and protected_fields.intersection(vals)
+            ):
+                raise UserError(
+                    _("Only draft leave requests can be edited.")
+                )
+            if (
+                not is_admin
+                and vals.get("employee_id")
+                and vals["employee_id"] != current_employee.id
+            ):
+                raise UserError(
+                    _("You cannot transfer a leave request to another employee.")
+                )
+        return super().write(vals)
+
+    def unlink(self):
+        """Prevent deletion of non-draft leave requests."""
         for record in self:
             if record.state != "draft":
                 raise UserError(
@@ -188,54 +282,143 @@ class LeaveRequest(models.Model):
     # -------------------------------------------------------------------------
     # Workflow Action Methods
     # -------------------------------------------------------------------------
-    def action_confirm(self):
+    def action_submit(self):
         """Submit the leave request for approval.
 
-        Transitions: Draft → Confirmed
-        Available to: The employee who created the request
+        Transitions: Draft → Submitted
+        Validates that an approver is assigned, then schedules
+        a to-do activity for the approver to review the request.
         """
         for record in self:
             if record.state != "draft":
                 raise UserError(
-                    _("Only draft requests can be submitted for approval.")
+                    _("Only draft requests can be submitted.")
                 )
-        self.write({"state": "confirmed"})
+            if not record.approver_id:
+                raise UserError(
+                    _("Please set an approver before submitting. "
+                      "The approver is the person who will review "
+                      "your leave request.")
+                )
+            record._check_employee_owner_or_admin()
+        self.with_context(leave_workflow_action=True).write({"state": "submitted"})
+        # Schedule approval activity for each approver
+        for record in self:
+            if record.approver_id.user_id:
+                record.activity_schedule(
+                    "mail.mail_activity_data_todo",
+                    user_id=record.approver_id.user_id.id,
+                    summary=_("Leave Request to Approve: %s") % record.name,
+                    note=_(
+                        "%s has requested %s day(s) of %s from %s to %s. "
+                        "Please review and approve or reject."
+                    ) % (
+                        record.employee_id.name,
+                        record.number_of_days,
+                        record.leave_type_id.name,
+                        record.date_from,
+                        record.date_to,
+                    ),
+                )
 
     def action_approve(self):
         """Approve the leave request.
 
-        Transitions: Confirmed → Approved
-        Available to: Leave Managers (the employee's manager)
+        Transitions: Submitted → Approved
+        Only the assigned approver (or a Leave Administrator) can approve.
+        Marks any pending approval activities as done.
         """
         for record in self:
-            if record.state != "confirmed":
+            if record.state != "submitted":
                 raise UserError(
-                    _("Only confirmed requests can be approved.")
+                    _("Only submitted requests can be approved.")
                 )
-        self.write({"state": "approved"})
+            record._check_approver_rights()
+        self.with_context(leave_workflow_action=True).write({"state": "approved"})
+        # Mark approval activities as done
+        self.activity_feedback(["mail.mail_activity_data_todo"])
 
-    def action_refuse(self):
-        """Refuse the leave request.
+    def action_reject(self):
+        """Reject the leave request.
 
-        Transitions: Confirmed → Refused
-        Available to: Leave Managers (the employee's manager)
+        Transitions: Submitted → Rejected
+        Only the assigned approver (or a Leave Administrator) can reject.
+        Marks any pending approval activities as done.
         """
         for record in self:
-            if record.state != "confirmed":
+            if record.state != "submitted":
                 raise UserError(
-                    _("Only confirmed requests can be refused.")
+                    _("Only submitted requests can be rejected.")
                 )
-        self.write({"state": "refused"})
+            record._check_approver_rights()
+        self.with_context(leave_workflow_action=True).write({"state": "rejected"})
+        # Mark approval activities as done
+        self.activity_feedback(["mail.mail_activity_data_todo"])
 
     def action_reset_to_draft(self):
-        """Reset a refused request back to draft.
+        """Reset a rejected request back to draft.
 
-        Transitions: Refused → Draft
-        Allows the employee to modify and resubmit a refused request.
+        Transitions: Rejected → Draft
+        Allows the employee to modify and resubmit a rejected request.
         """
         for record in self:
-            if record.state != "refused":
+            if record.state != "rejected":
                 raise UserError(
-                    _("Only refused requests can be reset to draft.")
+                    _("Only rejected requests can be reset to draft.")
                 )
-        self.write({"state": "draft"})
+            record._check_employee_owner_or_admin()
+        self.activity_unlink(["mail.mail_activity_data_todo"])
+        self.with_context(leave_workflow_action=True).write({"state": "draft"})
+
+    # -------------------------------------------------------------------------
+    # Helper Methods
+    # -------------------------------------------------------------------------
+    def _check_approver_rights(self):
+        """Verify that the current user is the assigned approver
+        or has Leave Administrator privileges.
+
+        This enforces the business rule: 'Only the assigned approver
+        can finalize approval.'
+        """
+        self.ensure_one()
+        is_admin = self._is_leave_admin()
+        if is_admin:
+            return
+        current_employee = self._get_current_employee()
+        is_approver = (
+            current_employee and current_employee == self.approver_id
+        )
+        is_manager = self.env.user.has_group(
+            "leave_request.group_leave_manager"
+        )
+        if not is_manager or not is_approver:
+            raise UserError(
+                _("Only the assigned approver (%s) or a Leave "
+                  "Administrator can approve/reject this request.")
+                % (self.approver_id.name or _("not set"))
+            )
+
+    def _check_employee_owner_or_admin(self):
+        """Allow only the employee owner or a Leave Administrator."""
+        self.ensure_one()
+        if self._is_leave_admin():
+            return
+        if self.employee_id != self._get_current_employee():
+            raise UserError(
+                _("Only the employee who owns this request can perform this action.")
+            )
+
+    def _get_current_employee(self, required=True):
+        """Return the HR employee linked to the current user."""
+        employee = self.env["hr.employee"].search(
+            [("user_id", "=", self.env.uid)], limit=1
+        )
+        if required and not employee:
+            raise UserError(
+                _("Your user is not linked to an employee record.")
+            )
+        return employee
+
+    def _is_leave_admin(self):
+        """Return whether the current user has Leave Administrator rights."""
+        return self.env.user.has_group("leave_request.group_leave_admin")
