@@ -54,48 +54,182 @@ Draft → Submitted → Approved
 
 ## Prerequisites
 
-- Odoo 17 Community Edition
-- Python 3.10+
-- PostgreSQL 14+
-- Required Odoo modules: `base`, `hr`, `mail` (auto-installed as dependencies)
+This project is an Odoo addon, not a standalone Python application. To run it, you need an Odoo 17 Community environment.
+
+You can run it in either of these ways:
+
+- **Recommended for reviewers:** Docker Desktop on Windows, macOS, or Linux
+- **Existing Odoo setup:** Odoo 17 Community, PostgreSQL, and Python 3.10+
+
+The module depends on these Odoo apps:
+
+- `base`
+- `hr`
+- `mail`
+
+Odoo installs these automatically when this module is installed.
 
 ---
 
 ## Installation
 
-### 1. Clone the Repository
+### Option A: Run With Docker
+
+This is the easiest cross-platform setup for Windows, macOS, and Linux.
+
+#### 1. Install Docker
+
+Install Docker Desktop:
+
+- Windows: Docker Desktop with WSL2 enabled
+- macOS: Docker Desktop
+- Linux: Docker Engine or Docker Desktop
+
+#### 2. Clone the Repository
+
 ```bash
 git clone https://github.com/mehedi-hridoy/Leave_Management.git
 cd Leave_Management
 ```
 
-### 2. Copy to Odoo Custom Addons
+#### 3. Create a Docker Network and Database
+
+```bash
+docker network create odoo-leave-network
+docker volume create odoo-leave-db-data
+docker run -d --name odoo-leave-db --network odoo-leave-network -e POSTGRES_DB=postgres -e POSTGRES_USER=odoo -e POSTGRES_PASSWORD=odoo -v odoo-leave-db-data:/var/lib/postgresql/data postgres:15
+```
+
+#### 4. Start Odoo 17
+
+Linux/macOS terminal:
+
+```bash
+docker run -d --name odoo-leave-app --network odoo-leave-network -p 8069:8069 -e HOST=odoo-leave-db -e USER=odoo -e PASSWORD=odoo -v "$(pwd)/custom_addons:/mnt/extra-addons" odoo:17.0
+```
+
+Windows PowerShell:
+
+```powershell
+docker run -d --name odoo-leave-app --network odoo-leave-network -p 8069:8069 -e HOST=odoo-leave-db -e USER=odoo -e PASSWORD=odoo -v "${PWD}/custom_addons:/mnt/extra-addons" odoo:17.0
+```
+
+#### 5. Open Odoo
+
+Open:
+
+```text
+http://localhost:8069
+```
+
+Create a new database from the Odoo database screen.
+
+#### 6. Install the Module
+
+1. Log in to Odoo.
+2. Go to **Apps**.
+3. Click **Update Apps List**.
+4. Search for **Leave Management**.
+5. Click **Activate**.
+
+### Option B: Install on an Existing Odoo 17 Instance
+
+Use this option if Odoo 17 is already installed on your machine or server.
+
+#### 1. Clone the Repository
+
+```bash
+git clone https://github.com/mehedi-hridoy/Leave_Management.git
+cd Leave_Management
+```
+
+#### 2. Copy the Addon Into Your Custom Addons Directory
+
+Linux example:
+
 ```bash
 sudo cp -r custom_addons/leave_request /opt/odoo/custom_addons/
 sudo chown -R odoo:odoo /opt/odoo/custom_addons/leave_request
 ```
 
-### 3. Restart Odoo
+Windows example:
+
+```powershell
+Copy-Item -Recurse .\custom_addons\leave_request C:\odoo\custom_addons\
+```
+
+macOS example:
+
+```bash
+cp -R custom_addons/leave_request /path/to/odoo/custom_addons/
+```
+
+#### 3. Confirm Your Odoo Addons Path
+
+Your Odoo configuration must include the custom addons directory.
+
+Example:
+
+```ini
+addons_path = /opt/odoo/odoo/addons,/opt/odoo/custom_addons
+```
+
+On Windows, use your actual Odoo paths, for example:
+
+```ini
+addons_path = C:\odoo\server\odoo\addons,C:\odoo\custom_addons
+```
+
+#### 4. Restart Odoo
+
+Linux service example:
+
 ```bash
 sudo systemctl restart odoo
 ```
 
-### 4. Access Odoo
-Open a web browser and navigate to:
+If you run Odoo manually from source:
+
+```bash
+python odoo-bin -c /path/to/odoo.conf
 ```
+
+#### 5. Update Apps and Install
+
+1. Open Odoo in your browser, usually:
+
+```text
 http://localhost:8069
 ```
-(or the IP/hostname of your Odoo server if remote)
 
-Login with credentials configured in your Odoo instance (default: admin / admin if using demo).
+2. Go to **Apps**.
+3. Click **Update Apps List**.
+4. Search for **Leave Management**.
+5. Click **Activate**.
 
-### 5. Install the Module
-1. Log in to Odoo → **Apps**
-2. Click **Update Apps List**
-3. Search for **"Leave Management"**
-4. Click **Activate**
+### Upgrade After Code Changes
 
-### 6. Assign User Roles
+If the module is already installed and you changed the source code, upgrade it.
+
+Linux service/source example:
+
+```bash
+sudo -u odoo /usr/bin/odoo -c /etc/odoo/odoo.conf -d YOUR_DATABASE_NAME -u leave_request --stop-after-init
+sudo systemctl restart odoo
+```
+
+Docker example:
+
+```bash
+docker restart odoo-leave-app
+```
+
+Then open Odoo, go to **Apps**, search for **Leave Management**, open the module, and click **Upgrade**.
+
+Replace `YOUR_DATABASE_NAME` with the database you created in Odoo when using the Linux/source command.
+
+### Assign User Roles
+
 1. Go to **Settings → Users & Companies → Users**
 2. Open each user who should use the module
 3. Under **Leave Management**, assign one role:
@@ -104,6 +238,24 @@ Login with credentials configured in your Odoo instance (default: admin / admin 
    - **Administrator** for full configuration and reporting access
 
 If the Leave Management app is not visible after installation, confirm that the logged-in user has one of these Leave Management roles.
+
+### Verify the Installation
+
+After installation, verify these points:
+
+1. The **Leave Management** app appears in the app launcher.
+2. **Leave Management → Leave Requests → My Requests** opens correctly.
+3. A user with the **User** role can create and submit their own leave request.
+4. A user with the **Manager** role can see assigned requests under **Requests to Approve**.
+5. Only the assigned approver can approve or reject the request.
+6. **Leave Management → Reporting → Leave Analysis** is visible to managers/admins.
+
+### Troubleshooting
+
+- If the app does not appear, update the Apps list and check the `addons_path`.
+- If the menu does not appear, assign a Leave Management role to the current user.
+- If approval fails, confirm the approver is linked to an `hr.employee` record and has the **Manager** role.
+- If Docker cannot start because port `8069` is already used, change `-p 8069:8069` to another port, for example `-p 8070:8069`, then open `http://localhost:8070`.
 
 ---
 
