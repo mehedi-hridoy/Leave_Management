@@ -154,7 +154,7 @@
                         domain="[('employee_id.user_id', '=', uid)]"/>
                 <filter string="My Team"
                         name="my_team"
-                        domain="[('manager_id.user_id', '=', uid)]"/>
+                        domain="[('employee_id.parent_id.user_id', '=', uid)]"/>
                 <filter string="To Approve"
                         name="to_approve"
                         domain="[('approver_id.user_id', '=', uid), ('state', '=', 'submitted')]"/>
