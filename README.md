@@ -193,12 +193,7 @@ leave_request/
 
 ---
 
-## Prompt Used
-
-Build a custom Odoo 17 Community module named `leave_request` for employee leave requests. The module must include a `leave.request` model, leave type, start and end dates, reason, status workflow, approver, computed leave days, submit/approve/reject/reset actions, role-based access control, record rules, form/tree/search views, pending approval reporting, notification/activity on submission, chatter support, date validation, kanban view, demo data, and README documentation.
-
----
 
 ## Author
 
-**Mehedi Hasan**
+**Mehedi Hasan Hridoy**
